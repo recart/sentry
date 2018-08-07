@@ -9,7 +9,7 @@ from __future__ import absolute_import, print_function
 
 from django.conf import settings
 from django.utils.functional import cached_property
-from six.moves.urllib.parse import urlparse
+from six.moves.urllib.parse import urlparse, parse_qs
 
 
 class RedisBackend(object):
@@ -38,16 +38,18 @@ class RedisBackend(object):
 class AmqpBackend(object):
     def __init__(self, broker_url):
         dsn = urlparse(broker_url)
+        qs = parse_qs(dsn.query)
         self.conn_info = dict(
             host=dsn.hostname,
             port=dsn.port,
             userid=dsn.username,
             password=dsn.password,
             virtual_host=dsn.path[1:],
+            ssl=dsn.scheme.endswith("+ssl") or bool(qs.get("ssl", False))
         )
 
     def get_conn(self):
-        from librabbitmq import Connection
+        from kombu import Connection
         return Connection(**self.conn_info)
 
     def _get_size_from_channel(self, channel, queue):
@@ -95,7 +97,9 @@ def get_queue_by_name(name):
 backends = {
     'redis': RedisBackend,
     'amqp': AmqpBackend,
+    'amqp+ssl': AmqpBackend,
     'librabbitmq': AmqpBackend,
+    'pyamqp': AmqpBackend
 }
 
 try:
